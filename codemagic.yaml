@@ -10,19 +10,65 @@ workflows:
       flutter: stable
       xcode: latest
     scripts:
+      - name: Create Flutter scaffold
+        script: |
+          # Generate full Flutter project structure
+          cd /tmp
+          flutter create gmp_scaffold --org com.gmpinspector --platforms ios,android
+          # Copy ios/ and android/ scaffolding into our project
+          cp -r /tmp/gmp_scaffold/ios $CM_BUILD_DIR/
+          cp -r /tmp/gmp_scaffold/android $CM_BUILD_DIR/
+          cp /tmp/gmp_scaffold/pubspec.lock $CM_BUILD_DIR/ 2>/dev/null || true
+          # Our pubspec.yaml and lib/main.dart are already in the repo
+      - name: Install dependencies
+        script: |
+          cd $CM_BUILD_DIR
+          flutter pub get
+      - name: Update iOS permissions
+        script: |
+          cd $CM_BUILD_DIR
+          # Add camera, microphone, photo library permissions to Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera access for GMP facility photo inspection'" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording during walkthroughs'" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library to analyze Meta Ray-Ban images'" ios/Runner/Info.plist 2>/dev/null || true
       - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files $(xcode-project detect-bundle-id) --type IOS_APP_STORE
+          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE
           keychain add-certificates
           xcode-project use-profiles
-      - name: Get Flutter packages
-        script: flutter pub get
       - name: Build iOS
-        script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+        script: |
+          cd $CM_BUILD_DIR
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+        
+  ios-debug:
+    name: iOS Debug (no signing)
+    max_build_duration: 30
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+    scripts:
+      - name: Create Flutter scaffold
+        script: |
+          cd /tmp
+          flutter create gmp_scaffold --org com.gmpinspector --platforms ios,android
+          cp -r /tmp/gmp_scaffold/ios $CM_BUILD_DIR/
+          cp -r /tmp/gmp_scaffold/android $CM_BUILD_DIR/
+      - name: Install dependencies
+        script: |
+          cd $CM_BUILD_DIR
+          flutter pub get
+      - name: Build debug
+        script: |
+          cd $CM_BUILD_DIR
+          flutter build ios --debug --no-codesign
+    artifacts:
+      - build/ios/**/*.app
