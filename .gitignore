@@ -1,0 +1,13 @@
+.dart_tool/
+.packages
+.pub/
+build/
+ios/Pods/
+ios/.symlinks/
+*.iml
+.idea/
+.DS_Store
+*.jks
+*.p12
+*.key
+.env
