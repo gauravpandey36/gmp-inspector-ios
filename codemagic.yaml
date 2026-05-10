@@ -1,74 +1,36 @@
 workflows:
-  ios-release:
-    name: iOS Release
+  default-workflow:
+    name: Default Workflow
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.gmpinspector.app
       flutter: stable
       xcode: latest
     scripts:
-      - name: Create Flutter scaffold
+      - name: Generate Flutter project scaffold
         script: |
-          # Generate full Flutter project structure
+          echo "Generating Flutter iOS/Android project structure..."
           cd /tmp
-          flutter create gmp_scaffold --org com.gmpinspector --platforms ios,android
-          # Copy ios/ and android/ scaffolding into our project
-          cp -r /tmp/gmp_scaffold/ios $CM_BUILD_DIR/
-          cp -r /tmp/gmp_scaffold/android $CM_BUILD_DIR/
-          cp /tmp/gmp_scaffold/pubspec.lock $CM_BUILD_DIR/ 2>/dev/null || true
-          # Our pubspec.yaml and lib/main.dart are already in the repo
-      - name: Install dependencies
+          flutter create scaffold_project --org com.gmpinspector --platforms ios,android --project-name gmp_inspector
+          echo "Copying iOS scaffold..."
+          cp -r /tmp/scaffold_project/ios/ $CM_BUILD_DIR/ios/
+          cp -r /tmp/scaffold_project/android/ $CM_BUILD_DIR/android/
+          cp /tmp/scaffold_project/lib/main.dart $CM_BUILD_DIR/lib/main_scaffold.dart 2>/dev/null || true
+          echo "Scaffold generated successfully"
+      - name: Install dependencies  
         script: |
           cd $CM_BUILD_DIR
           flutter pub get
-      - name: Update iOS permissions
+      - name: Add iOS permissions
         script: |
           cd $CM_BUILD_DIR
-          # Add camera, microphone, photo library permissions to Info.plist
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera access for GMP facility photo inspection'" ios/Runner/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording during walkthroughs'" ios/Runner/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library to analyze Meta Ray-Ban images'" ios/Runner/Info.plist 2>/dev/null || true
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE
-          keychain add-certificates
-          xcode-project use-profiles
-      - name: Build iOS
-        script: |
-          cd $CM_BUILD_DIR
-          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
-    artifacts:
-      - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
-        
-  ios-debug:
-    name: iOS Debug (no signing)
-    max_build_duration: 30
-    instance_type: mac_mini_m2
-    environment:
-      flutter: stable
-      xcode: latest
-    scripts:
-      - name: Create Flutter scaffold
-        script: |
-          cd /tmp
-          flutter create gmp_scaffold --org com.gmpinspector --platforms ios,android
-          cp -r /tmp/gmp_scaffold/ios $CM_BUILD_DIR/
-          cp -r /tmp/gmp_scaffold/android $CM_BUILD_DIR/
-      - name: Install dependencies
-        script: |
-          cd $CM_BUILD_DIR
-          flutter pub get
-      - name: Build debug
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP facility inspection'" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording'" ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library for Meta Ray-Ban images'" ios/Runner/Info.plist 2>/dev/null || true
+      - name: Build iOS (no code signing)
         script: |
           cd $CM_BUILD_DIR
           flutter build ios --debug --no-codesign
     artifacts:
       - build/ios/**/*.app
+      - build/**/*.ipa
