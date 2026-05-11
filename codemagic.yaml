@@ -24,16 +24,23 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP facility inspection'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library for Meta Ray-Ban images'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
-      - name: Update bundle identifier
+      - name: Update bundle ID and enable automatic signing
         script: |
           cd $CM_BUILD_DIR
+          # Fix bundle ID
           sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
+          # Set team ID for automatic signing
+          sed -i '' 's/DevelopmentTeam = "";/DevelopmentTeam = L5RDZ7965F;/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = L5RDZ7965F;/g' ios/Runner.xcodeproj/project.pbxproj
+          # Also add team where it might be missing
+          sed -i '' '/CODE_SIGN_IDENTITY/a\
+              DEVELOPMENT_TEAM = L5RDZ7965F;' ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || true
       - name: Set up code signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE --create
           keychain add-certificates
-          xcode-project use-profiles
+          xcode-project use-profiles --export-options-plist=/Users/builder/export_options.plist
       - name: Build iOS
         script: |
           cd $CM_BUILD_DIR
