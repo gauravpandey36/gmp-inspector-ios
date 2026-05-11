@@ -6,9 +6,6 @@ workflows:
     integrations:
       app_store_connect: GMP Inspector
     environment:
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.gmpinspector.app
       flutter: stable
       xcode: latest
     scripts:
@@ -27,6 +24,12 @@ workflows:
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP facility inspection'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library for Meta Ray-Ban images'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
+      - name: Update bundle identifier
+        script: |
+          cd $CM_BUILD_DIR
+          # Change bundle ID from default to our registered one
+          sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner/Info.plist 2>/dev/null || true
       - name: Set up code signing
         script: |
           keychain initialize
