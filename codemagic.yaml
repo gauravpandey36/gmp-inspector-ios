@@ -7,7 +7,7 @@ workflows:
       app_store_connect: Codemagic API
     environment:
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.gmpinspector.app
       flutter: stable
       xcode: latest
@@ -30,16 +30,13 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE
+          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_DEVELOPMENT --create
           keychain add-certificates
           xcode-project use-profiles
-      - name: Build iOS release
+      - name: Build iOS
         script: |
           cd $CM_BUILD_DIR
-          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --debug --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
+      - build/ios/**/*.app
