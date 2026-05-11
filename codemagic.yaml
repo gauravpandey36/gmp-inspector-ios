@@ -27,19 +27,25 @@ workflows:
       - name: Update bundle identifier
         script: |
           cd $CM_BUILD_DIR
-          # Change bundle ID from default to our registered one
           sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
-          sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner/Info.plist 2>/dev/null || true
       - name: Set up code signing
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_DEVELOPMENT --create
+          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
+      - name: Set version
+        script: |
+          cd $CM_BUILD_DIR
+          agvtool new-version -all 1
+          agvtool new-marketing-version 1.0.0
       - name: Build iOS
         script: |
           cd $CM_BUILD_DIR
-          flutter build ipa --debug --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/**/*.app
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
