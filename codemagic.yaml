@@ -4,33 +4,42 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.gmpinspector.app
       flutter: stable
       xcode: latest
     scripts:
       - name: Generate Flutter project scaffold
         script: |
-          echo "Generating Flutter iOS/Android project structure..."
           cd /tmp
-          flutter create scaffold_project --org com.gmpinspector --platforms ios,android --project-name gmp_inspector
-          echo "Copying iOS scaffold..."
-          cp -r /tmp/scaffold_project/ios/ $CM_BUILD_DIR/ios/
-          cp -r /tmp/scaffold_project/android/ $CM_BUILD_DIR/android/
-          cp /tmp/scaffold_project/lib/main.dart $CM_BUILD_DIR/lib/main_scaffold.dart 2>/dev/null || true
-          echo "Scaffold generated successfully"
-      - name: Install dependencies  
+          flutter create scaffold --org com.gmpinspector --platforms ios,android --project-name gmp_inspector
+          cp -r /tmp/scaffold/ios/ $CM_BUILD_DIR/ios/
+          cp -r /tmp/scaffold/android/ $CM_BUILD_DIR/android/
+      - name: Install dependencies
         script: |
           cd $CM_BUILD_DIR
           flutter pub get
       - name: Add iOS permissions
         script: |
-          cd $CM_BUILD_DIR
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP facility inspection'" ios/Runner/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording'" ios/Runner/Info.plist 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library for Meta Ray-Ban images'" ios/Runner/Info.plist 2>/dev/null || true
-      - name: Build iOS (no code signing)
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP facility inspection'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video recording'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library for Meta Ray-Ban images'" $CM_BUILD_DIR/ios/Runner/Info.plist 2>/dev/null || true
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Build iOS release
         script: |
           cd $CM_BUILD_DIR
-          flutter build ios --debug --no-codesign
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
-      - build/ios/**/*.app
-      - build/**/*.ipa
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - External Testers
