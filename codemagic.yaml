@@ -19,14 +19,10 @@ workflows:
         script: |
           cd $CM_BUILD_DIR
           flutter pub get
-      - name: Fix bundle ID and signing
+      - name: Fix bundle ID and add permissions
         script: |
           cd $CM_BUILD_DIR
-          # Fix bundle ID
           sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
-          # Switch to manual signing
-          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' ios/Runner.xcodeproj/project.pbxproj
-          # Add permissions
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP inspection'" ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video'" ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library access'" ios/Runner/Info.plist 2>/dev/null || true
@@ -36,14 +32,10 @@ workflows:
           app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
-      - name: Build Flutter
+      - name: Build and package
         script: |
           cd $CM_BUILD_DIR
-          flutter build ios --release --no-codesign
-      - name: Package IPA
-        script: |
-          cd $CM_BUILD_DIR
-          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
+          flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
