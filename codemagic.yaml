@@ -19,42 +19,33 @@ workflows:
         script: |
           cd $CM_BUILD_DIR
           flutter pub get
-      - name: Add iOS permissions and fix bundle ID
+      - name: Fix bundle ID and signing
         script: |
           cd $CM_BUILD_DIR
+          # Fix bundle ID
+          sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
+          # Switch to manual signing
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' ios/Runner.xcodeproj/project.pbxproj
+          # Add permissions
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Camera for GMP inspection'" ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string 'Microphone for video'" ios/Runner/Info.plist 2>/dev/null || true
           /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string 'Photo library access'" ios/Runner/Info.plist 2>/dev/null || true
-          sed -i '' 's/com.gmpinspector.gmpInspector/com.gmpinspector.app/g' ios/Runner.xcodeproj/project.pbxproj
       - name: Set up code signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE --create
           keychain add-certificates
           xcode-project use-profiles
-      - name: Build Flutter for iOS
+      - name: Build Flutter
         script: |
           cd $CM_BUILD_DIR
-          # Build Flutter app without code signing first
           flutter build ios --release --no-codesign
-      - name: Create signed IPA
+      - name: Package IPA
         script: |
-          cd $CM_BUILD_DIR/ios
-          # Archive with signing
-          xcodebuild -workspace Runner.xcworkspace \
-            -scheme Runner \
-            -sdk iphoneos \
-            -configuration Release \
-            -archivePath $CM_BUILD_DIR/build/Runner.xcarchive \
-            archive
-          # Export as IPA
-          xcodebuild -exportArchive \
-            -archivePath $CM_BUILD_DIR/build/Runner.xcarchive \
-            -exportOptionsPlist /Users/builder/export_options.plist \
-            -exportPath $CM_BUILD_DIR/build/ios/ipa
+          cd $CM_BUILD_DIR
+          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/Runner.xcarchive
     publishing:
       app_store_connect:
         auth: integration
