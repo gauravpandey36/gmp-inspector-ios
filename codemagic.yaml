@@ -31,54 +31,34 @@ workflows:
           keychain initialize
           app-store-connect fetch-signing-files "com.gmpinspector.app" --type IOS_APP_STORE --create
           keychain add-certificates
-      - name: Debug and configure signing
-        script: |
-          echo "=== Installed provisioning profiles ==="
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles dir"
-          echo ""
-          echo "=== Profile details ==="
-          for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
-            echo "--- $f ---"
-            security cms -D -i "$f" 2>/dev/null | grep -A1 "Name\|UUID\|TeamIdentifier\|application-identifier" | head -20
-            echo ""
-          done
-          echo ""
-          echo "=== Keychain certificates ==="
-          security find-identity -v -p codesigning
-      - name: Apply signing to Xcode project
+      - name: Configure signing manually
         script: |
           cd $CM_BUILD_DIR
-          # Get the provisioning profile UUID
           PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1 | xargs basename | sed 's/.mobileprovision//')
-          echo "Using profile UUID: $PROFILE_UUID"
-          
-          # Get the signing identity
-          SIGNING_IDENTITY=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
-          echo "Using identity: $SIGNING_IDENTITY"
-          
-          # Update pbxproj manually
+          SIGNING_ID=$(security find-identity -v -p codesigning | grep "Apple Distribution" | head -1 | awk -F'"' '{print $2}')
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "Signing ID: $SIGNING_ID"
           cd ios
-          # Set Manual signing
           sed -i '' 's/CODE_SIGN_STYLE = Automatic/CODE_SIGN_STYLE = Manual/g' Runner.xcodeproj/project.pbxproj
-          # Set team
           sed -i '' 's/DEVELOPMENT_TEAM = "";/DEVELOPMENT_TEAM = L5RDZ7965F;/g' Runner.xcodeproj/project.pbxproj
-          # Set provisioning profile
-          sed -i '' "s/PROVISIONING_PROFILE_SPECIFIER = \"\";/PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";/g" Runner.xcodeproj/project.pbxproj
-          # Add provisioning profile where missing
-          sed -i '' "/CODE_SIGN_IDENTITY/a\\
-\\				PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_UUID\";" Runner.xcodeproj/project.pbxproj 2>/dev/null || true
-          
-          echo "Signing configured manually"
-      - name: Build Flutter without signing
+          python3 -c "
+          import re
+          with open('Runner.xcodeproj/project.pbxproj') as f:
+              content = f.read()
+          content = content.replace('PROVISIONING_PROFILE_SPECIFIER = \"\";', 'PROVISIONING_PROFILE_SPECIFIER = \"${PROFILE_UUID}\";')
+          content = re.sub(r'(CODE_SIGN_IDENTITY = \"Apple Development\";)', r'CODE_SIGN_IDENTITY = \"Apple Distribution\";', content)
+          with open('Runner.xcodeproj/project.pbxproj', 'w') as f:
+              f.write(content)
+          " || echo "Python update skipped"
+          echo "Signing configured"
+      - name: Build Flutter
         script: |
           cd $CM_BUILD_DIR
           flutter build ios --release --no-codesign
       - name: Create signed IPA
         script: |
           cd $CM_BUILD_DIR
-          xcode-project build-ipa \
-            --workspace ios/Runner.xcworkspace \
-            --scheme Runner
+          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
     artifacts:
       - build/ios/ipa/*.ipa
       - "**/*.ipa"
