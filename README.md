@@ -14,4 +14,4 @@ Meta Ray-Ban + Claude AI (images) + Gemini AI (video).
 Built with Flutter. iOS builds via Codemagic CI/CD.
 
 ## Author
-Gourav Pandey | Principal Manager, R&D GMP PharmSci Quality
+Gourav Pandey 
