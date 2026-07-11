@@ -60,6 +60,10 @@ class _InspectorHomeState extends State<InspectorHome> with SingleTickerProvider
 
   static const String _systemPrompt = 'You are a GMP floor inspection co-pilot. Analyze photos/videos for compliance across 8 domains: Area Status, Equipment, GDP, Gowning, Materials, Environmental, EHS Safety, Line Clearance. For each finding: Severity (Critical/Major/Minor/Good Practice), Domain, Observation, Regulatory Reference, Recommended Action. Report only what you see. No fabrication. Cite regulations. This is a pre-screening aid.';
 
+  // --- Mentra Live glasses feed (via the glasses bridge) ---
+  static const String _bridgeUrl = 'https://gmp-glasses-bridge-production.up.railway.app';
+  static const String _bridgeToken = 'gmp-glasses-2026';
+
   @override
   void initState() {
     super.initState();
@@ -94,6 +98,23 @@ class _InspectorHomeState extends State<InspectorHome> with SingleTickerProvider
     if (image == null) return;
     final bytes = await image.readAsBytes();
     setState(() { _imageBytes = bytes; _imageReport = ''; });
+  }
+
+  Future<void> _pickFromGlasses() async {
+    setState(() { _imageReport = ''; });
+    try {
+      final resp = await http.get(Uri.parse('$_bridgeUrl/latest.jpg?token=$_bridgeToken'));
+      if (resp.statusCode == 200) {
+        setState(() { _imageBytes = resp.bodyBytes; });
+        await _analyzeImage();
+      } else if (resp.statusCode == 404) {
+        setState(() { _imageReport = 'No glasses photo yet. Press the button on your Mentra glasses, then tap "From Glasses" again.'; });
+      } else {
+        setState(() { _imageReport = 'Glasses fetch error ${resp.statusCode}'; });
+      }
+    } catch (e) {
+      setState(() { _imageReport = 'Glasses error: $e'; });
+    }
   }
 
   Future<void> _analyzeImage() async {
@@ -285,6 +306,10 @@ class _InspectorHomeState extends State<InspectorHome> with SingleTickerProvider
         Expanded(child: ElevatedButton.icon(icon: const Icon(Icons.photo_library), label: const Text('Gallery'),
           onPressed: () => _pickImage(ImageSource.gallery), style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade800, padding: const EdgeInsets.symmetric(vertical: 14)))),
       ]),
+      const SizedBox(height: 8),
+      ElevatedButton.icon(icon: const Icon(Icons.visibility), label: const Text('From Glasses (Mentra Live)', style: TextStyle(fontWeight: FontWeight.bold)),
+        onPressed: _imageAnalyzing ? null : _pickFromGlasses,
+        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade700, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
       const SizedBox(height: 12),
       ElevatedButton.icon(icon: _imageAnalyzing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.search),
         label: Text(_imageAnalyzing ? 'Analyzing...' : 'Inspect Photo', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
